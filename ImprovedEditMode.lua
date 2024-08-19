@@ -1,6 +1,76 @@
 local queueStatusButtonOverlayFrame = nil
 local queueStatusButtonOverlayFrameHook = nil
 local queueStatusButtonOverlayFrameHookEnabled = false
+local editModeImprovedEnabled = false
+
+local onHoverEnabled = {
+  MainMenuBar = false,
+  MultiBarLeft = false,
+  MultiBarRight = false,
+  MultiBarBottonLeft = false,
+  MultiBarBottonRight = false,
+  MultiBar5 = false,
+  MultiBar6 = false,
+  MultiBar7 = false,
+}
+
+local hideMacroTextEnabled = {
+  MainMenuBar = false,
+  MultiBarLeft = false,
+  MultiBarRight = false,
+  MultiBarBottonLeft = false,
+  MultiBarBottonRight = false,
+  MultiBar5 = false,
+  MultiBar6 = false,
+  MultiBar7 = false,
+}
+
+local frameHookSet = {
+  MainMenuBar = false,
+  MultiBarLeft = false,
+  MultiBarRight = false,
+  MultiBarBottonLeft = false,
+  MultiBarBottonRight = false,
+  MultiBar5 = false,
+  MultiBar6 = false,
+  MultiBar7 = false,
+  EditModeSystemSettingsDialog = false,
+}
+
+-- Cache frequently used globals
+local editModeSettingsDialog = EditModeSystemSettingsDialog
+local mainMenuBar = MainMenuBar
+
+-- extended settings
+local enum_EditModeActionBarSetting_HideMacroText = 10
+local enum_EditModeActionBarSetting_BarVisibility = 11
+local enum_ActionBarVisibleSetting_OnHover = 4
+
+local HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER = "On Hover"
+local HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT = "Hide Macro Text"
+
+--- Add a setting type to the EditModeSystemSettingsDialog for the given Frame
+---@param settingIndex number index value of added setting, passed back in editModeSystemSettingsDialog_OnSettingValueChanged
+---@param optionType number Enum option of type Enum.ChrCustomizationOptionType
+---@param settingData table Setting data that will be passed to SetupSetting
+local function addOptionToSettingsDialog(settingIndex, optionType, settingData)
+  assert(type(settingIndex) == "number")
+  assert(type(optionType) == "number")
+  assert(type(settingData) == "table")
+
+  local settingPool = editModeSettingsDialog:GetSettingPool(optionType)
+
+  if (settingPool) then
+    local settingFrame = settingPool:Acquire()
+    settingFrame:SetPoint("TOPLEFT")
+    settingFrame.layoutIndex = settingIndex
+    settingFrame:Show()
+
+    editModeSettingsDialog:Show();
+    editModeSettingsDialog:Layout();
+    settingFrame:SetupSetting(settingData)
+  end
+end
 
 local function setupFrame(frame, frameName, frameTemplate, parent, point, overlayWidth, overlayHeight, onMouseDownFunc,
                           onMouseUpFunc, label, databaseName)
@@ -49,12 +119,12 @@ local function restorePosition(frame, databaseName)
   end
 end
 
-local function onEditModeEnter(frame)
+local function showFrameHighlight(frame)
   frame:Show()
   frame.Selection:ShowHighlighted()
 end
 
-local function onEditModeExit(frame)
+local function hideFrameHighlight(frame)
   frame.Selection:Hide()
   frame.Selection.isSelected = false
   frame.Selection.isHighlighted = false
@@ -94,12 +164,30 @@ local function onMouseUp(frame, databaseName, pointDefault, relativeToDefault, r
   BUIIDatabase[databaseName]["yOffset"] = yOffset
 end
 
+--- Called when EditMode is enabled
 local function editMode_OnEnter()
-  onEditModeEnter(queueStatusButtonOverlayFrame)
+  showFrameHighlight(queueStatusButtonOverlayFrame)
+
+  -- In edit mode action bars should be shown even if normally hidden
+  for frameName in pairs(onHoverEnabled) do
+    local frame = _G[frameName]
+    if frame then
+      frame:SetAlpha(1)
+    end
+  end
 end
 
+--- Called when EditMode is disabled
 local function editMode_OnExit()
-  onEditModeExit(queueStatusButtonOverlayFrame)
+  hideFrameHighlight(queueStatusButtonOverlayFrame)
+
+  -- When exiting edit mode we need to hide aciton bars if they have onHoverEnabled
+  for frameName, enabled in pairs(onHoverEnabled) do
+    local frame = _G[frameName]
+    if frame and enabled then
+      frame:SetAlpha(0)
+    end
+  end
 end
 
 local function queueStatusButtonOverlayFrame_OnMouseDown()
@@ -133,16 +221,313 @@ local function resetQueueStatusButton()
   queueStatusButtonOverlayFrameHookEnabled = false
 end
 
+--- Add the additional settings to MainMenuBar
+--- @param frame table MainMenuBar frame
+local function settingsDialogMainMenuBarAddOptions(frame)
+  local hideMacroText = {
+    setting = enum_EditModeActionBarSetting_HideMacroText,
+    name = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT,
+    type = Enum.EditModeSettingDisplayType.Checkbox,
+  }
+
+  local hideMacroTextData = {
+    displayInfo = hideMacroText,
+    currentValue = 0,
+    settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT
+  }
+
+  addOptionToSettingsDialog(enum_EditModeActionBarSetting_HideMacroText,
+    Enum.ChrCustomizationOptionType.Checkbox,
+    hideMacroTextData)
+
+  local barVisibility = {
+    setting = enum_EditModeActionBarSetting_BarVisibility,
+    name = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING,
+    type = Enum.EditModeSettingDisplayType.Dropdown,
+    options = {
+      {
+        value = Enum.ActionBarVisibleSetting.Always,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ALWAYS
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.InCombat,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_IN_COMBAT
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.OutOfCombat,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_OUT_OF_COMBAT
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.Hidden,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_HIDDEN
+      },
+      {
+        value = enum_ActionBarVisibleSetting_OnHover,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER
+      },
+    }
+  }
+
+  local barVisibilityData = {
+    displayInfo = barVisibility,
+    currentValue = 0,
+    settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
+  }
+
+  addOptionToSettingsDialog(enum_EditModeActionBarSetting_BarVisibility,
+    Enum.ChrCustomizationOptionType.Dropdown,
+    barVisibilityData)
+end
+
+--- Add the additional settings to MultiBar e.g any action bar that isn't the main one
+--- @param frame table MainMenuBar frame
+local function settingsDialogMultiBarAddOptions(frame)
+  local hideMacroText = {
+    setting = enum_EditModeActionBarSetting_HideMacroText,
+    name = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT,
+    type = Enum.EditModeSettingDisplayType.Checkbox,
+  }
+  local hideMacroTextData = {
+    displayInfo = hideMacroText,
+    currentValue = 0,
+    settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT
+  }
+  addOptionToSettingsDialog(enum_EditModeActionBarSetting_HideMacroText, Enum.ChrCustomizationOptionType.Checkbox,
+    hideMacroTextData)
+end
+
+--- Hooked to EditModeSystemSettingsDialog:UpdateSettings
+---@param self table EditModeSystemSettingsDialog
+---@param systemFrame table The frame the settings belong to e.g MainMenuBar
+local function editModeSystemSettingsDialog_OnUpdateSettings(self, systemFrame)
+  if not editModeImprovedEnabled then return end
+
+  -- TODO: Need to fix taint produced when pressing "Action Bar Settings" after a bit
+  if systemFrame == self.attachedToSystem then
+    local currentFrameName = systemFrame:GetName()
+
+    if currentFrameName == "MainMenuBar" then
+      settingsDialogMainMenuBarAddOptions(systemFrame)
+    elseif strfind(currentFrameName, "MultiBar") then
+      settingsDialogMultiBarAddOptions(systemFrame)
+    end
+  end
+end
+
+--- Used to give Show on Hover functionality to action bars
+---@param self table Frame that triggered the OnEnter event
+local function actionBar_OnEnter(self)
+  if strfind(self:GetName(), "ActionButton") then
+    if not onHoverEnabled["MainMenuBar"] then return end
+    mainMenuBar:SetAlpha(1)
+  else
+    for actionBarName, enabled in pairs(onHoverEnabled) do
+      if strfind(self:GetName(), actionBarName) and enabled then
+        _G[actionBarName]:SetAlpha(1)
+      end
+    end
+  end
+end
+
+--- Used to give Show on Hover functionality to action bars
+---@param self table Frame that triggered the OnLeave event
+local function actionBar_OnLeave(self)
+  if strfind(self:GetName(), "ActionButton") then
+    if not onHoverEnabled["MainMenuBar"] then return end
+    mainMenuBar:SetAlpha(0)
+  else
+    for actionBarName, enabled in pairs(onHoverEnabled) do
+      if strfind(self:GetName(), actionBarName) and enabled then
+        _G[actionBarName]:SetAlpha(0)
+      end
+    end
+  end
+end
+
+--- Sets the hooks needed to enable On Hover for action bars
+---@param frame table The action bar frame being configured
+local function hookActionBarOnHoverEvent(frame)
+  if frameHookSet[frame:GetName()] then
+    return
+  end
+
+  -- Need to add OnEnter/OnLeave hooks on each button otherwise we only
+  -- hover the action bar when the mouse is between buttons..
+  if frame:GetName() == "MainMenuBar" then
+    for i = 12, 1, -1 do
+      _G["ActionButton" .. i]:HookScript("OnEnter", actionBar_OnEnter)
+      _G["ActionButton" .. i]:HookScript("OnLeave", actionBar_OnLeave)
+    end
+  elseif strfind(frame:GetName(), "MultiBar") then
+    for i = 12, 1, -1 do
+      _G[frame:GetName() .. "Button" .. i]:HookScript("OnEnter", actionBar_OnEnter)
+      _G[frame:GetName() .. "Button" .. i]:HookScript("OnLeave", actionBar_OnLeave)
+    end
+  end
+
+  frame:HookScript("OnEnter", actionBar_OnEnter)
+  frame:HookScript("OnLeave", actionBar_OnLeave)
+
+  frameHookSet[frame:GetName()] = true
+end
+
+--- When the onHoverEnabled table is updated this function should be called
+--- to apply the settings if needed
+local function onHoverSettings_OnUpdate()
+  for frameName, enabled in pairs(onHoverEnabled) do
+    local frame = _G[frameName]
+    if frame then
+      if enabled then
+        frame:SetAlpha(0)
+        hookActionBarOnHoverEvent(frame)
+      else
+        frame:SetAlpha(1)
+      end
+    end
+  end
+end
+
+--- When the hideMacroTextEnabled table is updated this function should be called
+--- to apply the settings if needed
+local function hideMacroTextSettings_OnUpdate()
+  for frameName, enabled in pairs(hideMacroTextEnabled) do
+    for i = 12, 1, -1 do
+      if frameName == "MainMenuBar" then frameName = "Action" end
+      local button = _G[frameName .. "Button" .. i .. "Name"]
+      if button then
+        if enabled then
+          button:SetAlpha(0)
+        else
+          button:SetAlpha(1)
+        end
+      end
+    end
+  end
+end
+
+--- Called when a setting value changes
+---@param self table EditModeSystemSettingsDialog frame
+---@param setting number Enum of the setting getting changed
+---@param value number New value for the setting that is changing
+local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting, value)
+  -- print("editModeSystemSettingsDialog_OnSettingValueChanged: setting ", setting, " value ", value)
+  local currentFrame = self.attachedToSystem
+  local currentFrameName = currentFrame:GetName()
+
+  -- TODO: refactor this crap
+  if currentFrameName == "MainMenuBar" then
+    if setting == enum_EditModeActionBarSetting_HideMacroText then
+      hideMacroTextEnabled["MainMenuBar"] = true
+      hideMacroTextSettings_OnUpdate()
+      -- for i = 12, 1, -1 do
+      --   local button = _G["ActionButton" .. i .. "Name"]
+      --   button:SetAlpha(1 - value)
+      -- end
+    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.Always then
+      onHoverEnabled["MainMenuBar"] = false
+      onHoverSettings_OnUpdate()
+    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.InCombat then
+      onHoverEnabled["MainMenuBar"] = false
+      onHoverSettings_OnUpdate()
+      print("In Combat MainMenuBar Not supported yet")
+    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.OutOfCombat then
+      onHoverEnabled["MainMenuBar"] = false
+      onHoverSettings_OnUpdate()
+      print("Out of Combat MainMenuBar Not supported yet")
+      -- currentFrame:Show()
+      -- -- Hack to fix currentValue of Dropdown not updating
+      local children = { self.Settings:GetChildren() }
+      for i, child in ipairs(children) do
+        print(i, child:GetObjectType(), child:GetDebugName(), child.Label:GetText())
+        print(child.Label:GetText())
+        if child.Label:GetText() == "Bar Visible" then
+          print("YEP")
+          child.Dropdown.Text:SetText("NEW TEXT")
+        end
+      end
+    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.Hidden then
+      onHoverEnabled["MainMenuBar"] = false
+      onHoverSettings_OnUpdate()
+      print("Hidden MainMenuBar Not supported yet")
+      -- currentFrame.visibility = "Hidden"
+      -- currentFrame:SetShown(false)
+      -- currentFrame:Hide()
+    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
+      onHoverEnabled["MainMenuBar"] = true
+      onHoverSettings_OnUpdate()
+    end
+  elseif strfind(currentFrameName, "MultiBar") then
+    if setting == enum_EditModeActionBarSetting_HideMacroText then
+      hideMacroTextEnabled[currentFrameName] = true
+      hideMacroTextSettings_OnUpdate()
+      -- for i = 12, 1, -1 do
+      --   local button = _G[currentFrameName .. "Button" .. i .. "Name"]
+      --   button:SetAlpha(1 - value)
+      -- end
+    elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == enum_ActionBarVisibleSetting_OnHover then
+      onHoverEnabled[currentFrameName] = true
+      onHoverSettings_OnUpdate()
+      -- hookActionBarOnHoverEvent(currentFrame)
+    elseif setting == Enum.EditModeActionBarSetting.VisibleSetting then
+      onHoverEnabled[currentFrameName] = false
+      onHoverSettings_OnUpdate()
+      -- currentFrame:SetAlpha(1)
+    end
+  end
+
+  BUIIDatabase["edit_mode_on_hover_enabled"] = onHoverEnabled
+  BUIIDatabase["edit_mode_hide_macro_text_enabled"] = hideMacroTextEnabled
+end
+
+--- Register nessecary hooks for Edit Mode Setttings
+local function setupEditModeSystemSettingsDialog()
+  if not frameHookSet["EditModeSystemSettingsDialog"] then
+    hooksecurefunc(editModeSettingsDialog, "UpdateSettings", editModeSystemSettingsDialog_OnUpdateSettings)
+    hooksecurefunc(editModeSettingsDialog, "OnSettingValueChanged", editModeSystemSettingsDialog_OnSettingValueChanged)
+    frameHookSet["EditModeSystemSettingsDialog"] = true
+
+    -- Add the On Hover option for MultiBar frames
+    local actionBarDropdownOptions = EditModeSettingDisplayInfoManager.systemSettingDisplayInfo
+        [Enum.EditModeSystem.ActionBar][Enum.EditModeActionBarSetting.VisibleSetting + 1].options
+    local extraOption = {
+      value = enum_ActionBarVisibleSetting_OnHover,
+      text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER
+    }
+    table.insert(actionBarDropdownOptions, extraOption)
+
+    -- local mainActionBarSettings = EDIT_MODE_MODERN_SYSTEM_MAP[Enum.EditModeSystem.ActionBar][Enum.EditModeActionBarSystemIndices.MainBar].settings
+    -- -- local key = "Enum.EditModeActionBarSetting.VisibleSetting"
+    -- table.insert(mainActionBarSettings, Enum.ActionBarVisibleSetting.Always)
+  end
+end
+
+--- Enable Improved EditMode module
 function BUII_ImprovedEditModeEnable()
   setupQueueStatusButton()
+  setupEditModeSystemSettingsDialog()
+
+  if BUIIDatabase["edit_mode_on_hover_enabled"] then
+    onHoverEnabled = BUIIDatabase["edit_mode_on_hover_enabled"]
+    onHoverSettings_OnUpdate()
+  end
+
+  if BUIIDatabase["edit_mode_hide_macro_text_enabled"] then
+    hideMacroTextEnabled = BUIIDatabase["edit_mode_hide_macro_text_enabled"]
+    hideMacroTextSettings_OnUpdate()
+  end
 
   EventRegistry:RegisterCallback("EditMode.Enter", editMode_OnEnter, "BUII_ImprovedEditMode_OnEnter")
   EventRegistry:RegisterCallback("EditMode.Exit", editMode_OnExit, "BUI_ImprovedEditMode_OnExit")
+
+  editModeImprovedEnabled = true
 end
 
+--- Disable Improved EditMode module
 function BUII_ImprovedEditModeDisable()
   resetQueueStatusButton()
 
   EventRegistry:UnregisterCallback("EditMode.Enter", "BUII_ImprovedEditMode_OnEnter")
   EventRegistry:UnregisterCallback("EditMode.Exit", "BUI_ImprovedEditMode_OnExit")
+
+  editModeImprovedEnabled = false
 end
