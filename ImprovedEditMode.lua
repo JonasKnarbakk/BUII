@@ -704,24 +704,10 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
       onHoverEnabled["MainMenuBar"] = false
       onHoverSettings_OnUpdate()
       print("Out of Combat MainMenuBar Not supported yet")
-      -- currentFrame:Show()
-      -- -- Hack to fix currentValue of Dropdown not updating
-      local children = { self.Settings:GetChildren() }
-      for i, child in ipairs(children) do
-        print(i, child:GetObjectType(), child:GetDebugName(), child.Label:GetText())
-        print(child.Label:GetText())
-        if child.Label:GetText() == "Bar Visible" then
-          print("YEP")
-          child.Dropdown.Text:SetText("NEW TEXT")
-        end
-      end
     elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.Hidden then
       onHoverEnabled["MainMenuBar"] = false
       onHoverSettings_OnUpdate()
       print("Hidden MainMenuBar Not supported yet")
-      -- currentFrame.visibility = "Hidden"
-      -- currentFrame:SetShown(false)
-      -- currentFrame:Hide()
     elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
       onHoverEnabled["MainMenuBar"] = true
       onHoverSettings_OnUpdate()
@@ -778,10 +764,6 @@ local function setupEditModeSystemSettingsDialog()
       text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER
     }
     table.insert(actionBarDropdownOptions, extraOption)
-
-    -- local mainActionBarSettings = EDIT_MODE_MODERN_SYSTEM_MAP[Enum.EditModeSystem.ActionBar][Enum.EditModeActionBarSystemIndices.MainBar].settings
-    -- -- local key = "Enum.EditModeActionBarSetting.VisibleSetting"
-    -- table.insert(mainActionBarSettings, Enum.ActionBarVisibleSetting.Always)
   end
 end
 
