@@ -43,6 +43,7 @@ local frameHookSet = {
 
 local bagFrames = {
   MainMenuBarBackpackButton = true,
+  BagBarExpandToggle = true,
   CharacterBag0Slot = true,
   CharacterBag1Slot = true,
   CharacterBag2Slot = true,
@@ -562,10 +563,6 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
     if setting == enum_EditModeActionBarSetting_HideMacroText then
       hideMacroTextEnabled["MainMenuBar"] = true
       hideMacroTextSettings_OnUpdate()
-      -- for i = 12, 1, -1 do
-      --   local button = _G["ActionButton" .. i .. "Name"]
-      --   button:SetAlpha(1 - value)
-      -- end
     elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.Always then
       onHoverEnabled["MainMenuBar"] = false
       onHoverSettings_OnUpdate()
@@ -603,18 +600,12 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
     if setting == enum_EditModeActionBarSetting_HideMacroText then
       hideMacroTextEnabled[currentFrameName] = true
       hideMacroTextSettings_OnUpdate()
-      -- for i = 12, 1, -1 do
-      --   local button = _G[currentFrameName .. "Button" .. i .. "Name"]
-      --   button:SetAlpha(1 - value)
-      -- end
     elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == enum_ActionBarVisibleSetting_OnHover then
       onHoverEnabled[currentFrameName] = true
       onHoverSettings_OnUpdate()
-      -- hookActionBarOnHoverEvent(currentFrame)
     elseif setting == Enum.EditModeActionBarSetting.VisibleSetting then
       onHoverEnabled[currentFrameName] = false
       onHoverSettings_OnUpdate()
-      -- currentFrame:SetAlpha(1)
     end
   elseif currentFrameName == "BagsBar" then
     if setting == enum_BagsBarSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
