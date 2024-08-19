@@ -628,7 +628,9 @@ local function onHoverSettings_OnUpdate()
     local frame = _G[frameName]
     if frame then
       if enabled then
-        frame:SetAlpha(0)
+        if not editModeManagerFrame.editModeActive then
+          frame:SetAlpha(0)
+        end
         hookActionBarOnHoverEvent(frame)
       else
         frame:SetAlpha(1)
