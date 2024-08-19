@@ -13,6 +13,7 @@ local onHoverEnabled = {
   MultiBar6 = false,
   MultiBar7 = false,
   BagsBar = false,
+  MicroMenu = false,
 }
 
 local hideMacroTextEnabled = {
@@ -36,6 +37,7 @@ local frameHookSet = {
   MultiBar6 = false,
   MultiBar7 = false,
   BagsBar = false,
+  MicroMenu = false,
   EditModeSystemSettingsDialog = false,
 }
 
@@ -48,16 +50,32 @@ local bagFrames = {
   CharacterReagentBag0Slot = true,
 }
 
+local microMenuFrames = {
+  CharacterMicroButton = true,
+  ProfessionMicroButton = true,
+  PlayerSpellsMicroButton = true,
+  AchievementMicroButton = true,
+  QuestLogMicroButton = true,
+  GuildMicroButton = true,
+  LFDMicroButton = true,
+  CollectionsMicroButton = true,
+  EJMicroButton = true,
+  StoreMicroButton = true,
+  MainMenuMicroButton = true,
+}
+
 -- Cache frequently used globals
 local editModeSettingsDialog = EditModeSystemSettingsDialog
 local mainMenuBar = MainMenuBar
 local bagsBar = BagsBar
+local microMenu = MicroMenu
 
 -- extended settings
 local enum_EditModeActionBarSetting_HideMacroText = 10
 local enum_EditModeActionBarSetting_BarVisibility = 11
 local enum_ActionBarVisibleSetting_OnHover = 4
 local enum_BagsBarSetting_BarVisibility = 3
+local enum_MicroMenuSetting_BarVisibility = 3
 
 local HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER = "On Hover"
 local HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT = "Hide Macro Text"
@@ -348,6 +366,47 @@ local function settingsDialogBagBarAddOptions()
     barVisibilityData)
 end
 
+--- Add the additional settings to MicroMenu
+local function settingsDialogMicroMenuAddOptions()
+  local barVisibility = {
+    setting = enum_MicroMenuSetting_BarVisibility,
+    name = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING,
+    type = Enum.EditModeSettingDisplayType.Dropdown,
+    options = {
+      {
+        value = Enum.ActionBarVisibleSetting.Always,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ALWAYS
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.InCombat,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_IN_COMBAT
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.OutOfCombat,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_OUT_OF_COMBAT
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.Hidden,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_HIDDEN
+      },
+      {
+        value = enum_ActionBarVisibleSetting_OnHover,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER
+      },
+    }
+  }
+
+  local barVisibilityData = {
+    displayInfo = barVisibility,
+    currentValue = 0,
+    settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
+  }
+
+  addOptionToSettingsDialog(enum_EditModeActionBarSetting_BarVisibility,
+    Enum.ChrCustomizationOptionType.Dropdown,
+    barVisibilityData)
+end
+
 --- Hooked to EditModeSystemSettingsDialog:UpdateSettings
 ---@param self table EditModeSystemSettingsDialog
 ---@param systemFrame table The frame the settings belong to e.g MainMenuBar
@@ -364,6 +423,8 @@ local function editModeSystemSettingsDialog_OnUpdateSettings(self, systemFrame)
       settingsDialogMultiBarAddOptions()
     elseif currentFrameName == "BagsBar" then
       settingsDialogBagBarAddOptions()
+    elseif currentFrameName == "MicroMenuContainer" then
+      settingsDialogMicroMenuAddOptions()
     end
   end
 end
@@ -377,6 +438,9 @@ local function actionBar_OnEnter(self)
   elseif bagFrames[self:GetName()] then
     if not onHoverEnabled["BagsBar"] then return end
     bagsBar:SetAlpha(1)
+  elseif microMenuFrames[self:GetName()] then
+    if not onHoverEnabled["MicroMenu"] then return end
+    microMenu:SetAlpha(1)
   else
     for actionBarName, enabled in pairs(onHoverEnabled) do
       if strfind(self:GetName(), actionBarName) and enabled then
@@ -395,6 +459,9 @@ local function actionBar_OnLeave(self)
   elseif bagFrames[self:GetName()] then
     if not onHoverEnabled["BagsBar"] then return end
     bagsBar:SetAlpha(0)
+  elseif microMenuFrames[self:GetName()] then
+    if not onHoverEnabled["MicroMenu"] then return end
+    microMenu:SetAlpha(0)
   else
     for actionBarName, enabled in pairs(onHoverEnabled) do
       if strfind(self:GetName(), actionBarName) and enabled then
@@ -428,7 +495,15 @@ local function hookActionBarOnHoverEvent(frame)
       local subframe = _G[bagFrameName]
       if subframe then
         subframe:HookScript("OnEnter", actionBar_OnEnter)
-        subframe:HookScript("OnLeave", actionBar_OnEnter)
+        subframe:HookScript("OnLeave", actionBar_OnLeave)
+      end
+    end
+  elseif frame:GetName() == "MicroMenu" then
+    for microMenuFrameName in pairs(microMenuFrames) do
+      local subframe = _G[microMenuFrameName]
+      if subframe then
+        subframe:HookScript("OnEnter", actionBar_OnEnter)
+        subframe:HookScript("OnLeave", actionBar_OnLeave)
       end
     end
   end
@@ -547,6 +622,14 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
       onHoverSettings_OnUpdate()
     elseif setting == enum_BagsBarSetting_BarVisibility then
       onHoverEnabled[currentFrameName] = false
+      onHoverSettings_OnUpdate()
+    end
+  elseif currentFrameName == "MicroMenuContainer" then
+    if setting == enum_MicroMenuSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
+      onHoverEnabled["MicroMenu"] = true
+      onHoverSettings_OnUpdate()
+    elseif setting == enum_BagsBarSetting_BarVisibility then
+      onHoverEnabled["MicroMenu"] = false
       onHoverSettings_OnUpdate()
     end
   end
