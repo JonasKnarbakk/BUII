@@ -102,6 +102,7 @@ local keybindPatterns = {
 }
 
 -- Cache frequently used globals
+local editModeManagerFrame = EditModeManagerFrame
 local editModeSettingsDialog = EditModeSystemSettingsDialog
 local mainMenuBar = MainMenuBar
 local bagsBar = BagsBar
@@ -202,7 +203,7 @@ local function hideFrameHighlight(frame)
 end
 
 local function onMouseDown(frame)
-  EditModeManagerFrame:SelectSystem(frame:GetParent())
+  editModeManagerFrame:SelectSystem(frame:GetParent())
   frame.Selection:ShowSelected()
   frame:GetParent():SetMovable(true)
   frame:GetParent():SetClampedToScreen(true)
@@ -301,7 +302,7 @@ local function settingsDialogMainMenuBarAddOptions()
 
   local hideMacroTextData = {
     displayInfo = hideMacroText,
-    currentValue = 0,
+    currentValue = hideMacroTextEnabled["MainMenuBar"] == true and 1 or 0,
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT
   }
 
@@ -355,7 +356,7 @@ local function settingsDialogMainMenuBarAddOptions()
 
   local barVisibilityData = {
     displayInfo = barVisibility,
-    currentValue = 0,
+    currentValue = onHoverEnabled["MainMenuBar"] == true and enum_ActionBarVisibleSetting_OnHover or Enum.ActionBarVisibleSetting.Always,
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
   }
 
@@ -374,7 +375,7 @@ local function settingsDialogMultiBarAddOptions(frameName)
   }
   local hideMacroTextData = {
     displayInfo = hideMacroText,
-    currentValue = 0,
+    currentValue = hideMacroTextEnabled[frameName] == true and 1 or 0,
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT
   }
   addOptionToSettingsDialog(enum_EditModeActionBarSetting_HideMacroText, Enum.ChrCustomizationOptionType.Checkbox,
@@ -429,7 +430,7 @@ local function settingsDialogBagBarAddOptions()
 
   local barVisibilityData = {
     displayInfo = barVisibility,
-    currentValue = 0,
+    currentValue = onHoverEnabled["BagsBar"] == true and enum_ActionBarVisibleSetting_OnHover or Enum.ActionBarVisibleSetting.Always,
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
   }
 
@@ -470,7 +471,7 @@ local function settingsDialogMicroMenuAddOptions()
 
   local barVisibilityData = {
     displayInfo = barVisibility,
-    currentValue = 0,
+    currentValue = onHoverEnabled["MicroMenu"] == true and enum_ActionBarVisibleSetting_OnHover or Enum.ActionBarVisibleSetting.Always,
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
   }
 
@@ -684,7 +685,7 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
   -- TODO: refactor this crap
   if currentFrameName == "MainMenuBar" then
     if setting == enum_EditModeActionBarSetting_HideMacroText then
-      hideMacroTextEnabled["MainMenuBar"] = true
+      hideMacroTextEnabled["MainMenuBar"] = value == 1 and true or false
       hideMacroTextSettings_OnUpdate()
     elseif setting == enum_EditModeActionBarSetting_AbbreviateKeybindings then
       abbreviatedKeybindingsEnabled["MainMenuBar"] = value == 1 and true or false
