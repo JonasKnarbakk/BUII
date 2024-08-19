@@ -12,6 +12,7 @@ local onHoverEnabled = {
   MultiBar5 = false,
   MultiBar6 = false,
   MultiBar7 = false,
+  BagsBar = false,
 }
 
 local hideMacroTextEnabled = {
@@ -34,17 +35,29 @@ local frameHookSet = {
   MultiBar5 = false,
   MultiBar6 = false,
   MultiBar7 = false,
+  BagsBar = false,
   EditModeSystemSettingsDialog = false,
+}
+
+local bagFrames = {
+  MainMenuBarBackpackButton = true,
+  CharacterBag0Slot = true,
+  CharacterBag1Slot = true,
+  CharacterBag2Slot = true,
+  CharacterBag3Slot = true,
+  CharacterReagentBag0Slot = true,
 }
 
 -- Cache frequently used globals
 local editModeSettingsDialog = EditModeSystemSettingsDialog
 local mainMenuBar = MainMenuBar
+local bagsBar = BagsBar
 
 -- extended settings
 local enum_EditModeActionBarSetting_HideMacroText = 10
 local enum_EditModeActionBarSetting_BarVisibility = 11
 local enum_ActionBarVisibleSetting_OnHover = 4
+local enum_BagsBarSetting_BarVisibility = 3
 
 local HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER = "On Hover"
 local HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT = "Hide Macro Text"
@@ -222,8 +235,7 @@ local function resetQueueStatusButton()
 end
 
 --- Add the additional settings to MainMenuBar
---- @param frame table MainMenuBar frame
-local function settingsDialogMainMenuBarAddOptions(frame)
+local function settingsDialogMainMenuBarAddOptions()
   local hideMacroText = {
     setting = enum_EditModeActionBarSetting_HideMacroText,
     name = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT,
@@ -280,8 +292,7 @@ local function settingsDialogMainMenuBarAddOptions(frame)
 end
 
 --- Add the additional settings to MultiBar e.g any action bar that isn't the main one
---- @param frame table MainMenuBar frame
-local function settingsDialogMultiBarAddOptions(frame)
+local function settingsDialogMultiBarAddOptions()
   local hideMacroText = {
     setting = enum_EditModeActionBarSetting_HideMacroText,
     name = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT,
@@ -296,6 +307,47 @@ local function settingsDialogMultiBarAddOptions(frame)
     hideMacroTextData)
 end
 
+--- Add the additional settings to BagsBar
+local function settingsDialogBagBarAddOptions()
+  local barVisibility = {
+    setting = enum_BagsBarSetting_BarVisibility,
+    name = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING,
+    type = Enum.EditModeSettingDisplayType.Dropdown,
+    options = {
+      {
+        value = Enum.ActionBarVisibleSetting.Always,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ALWAYS
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.InCombat,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_IN_COMBAT
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.OutOfCombat,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_OUT_OF_COMBAT
+      },
+      {
+        value = Enum.ActionBarVisibleSetting.Hidden,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_HIDDEN
+      },
+      {
+        value = enum_ActionBarVisibleSetting_OnHover,
+        text = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER
+      },
+    }
+  }
+
+  local barVisibilityData = {
+    displayInfo = barVisibility,
+    currentValue = 0,
+    settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
+  }
+
+  addOptionToSettingsDialog(enum_EditModeActionBarSetting_BarVisibility,
+    Enum.ChrCustomizationOptionType.Dropdown,
+    barVisibilityData)
+end
+
 --- Hooked to EditModeSystemSettingsDialog:UpdateSettings
 ---@param self table EditModeSystemSettingsDialog
 ---@param systemFrame table The frame the settings belong to e.g MainMenuBar
@@ -307,9 +359,11 @@ local function editModeSystemSettingsDialog_OnUpdateSettings(self, systemFrame)
     local currentFrameName = systemFrame:GetName()
 
     if currentFrameName == "MainMenuBar" then
-      settingsDialogMainMenuBarAddOptions(systemFrame)
+      settingsDialogMainMenuBarAddOptions()
     elseif strfind(currentFrameName, "MultiBar") then
-      settingsDialogMultiBarAddOptions(systemFrame)
+      settingsDialogMultiBarAddOptions()
+    elseif currentFrameName == "BagsBar" then
+      settingsDialogBagBarAddOptions()
     end
   end
 end
@@ -320,6 +374,9 @@ local function actionBar_OnEnter(self)
   if strfind(self:GetName(), "ActionButton") then
     if not onHoverEnabled["MainMenuBar"] then return end
     mainMenuBar:SetAlpha(1)
+  elseif bagFrames[self:GetName()] then
+    if not onHoverEnabled["BagsBar"] then return end
+    bagsBar:SetAlpha(1)
   else
     for actionBarName, enabled in pairs(onHoverEnabled) do
       if strfind(self:GetName(), actionBarName) and enabled then
@@ -335,6 +392,9 @@ local function actionBar_OnLeave(self)
   if strfind(self:GetName(), "ActionButton") then
     if not onHoverEnabled["MainMenuBar"] then return end
     mainMenuBar:SetAlpha(0)
+  elseif bagFrames[self:GetName()] then
+    if not onHoverEnabled["BagsBar"] then return end
+    bagsBar:SetAlpha(0)
   else
     for actionBarName, enabled in pairs(onHoverEnabled) do
       if strfind(self:GetName(), actionBarName) and enabled then
@@ -362,6 +422,14 @@ local function hookActionBarOnHoverEvent(frame)
     for i = 12, 1, -1 do
       _G[frame:GetName() .. "Button" .. i]:HookScript("OnEnter", actionBar_OnEnter)
       _G[frame:GetName() .. "Button" .. i]:HookScript("OnLeave", actionBar_OnLeave)
+    end
+  elseif frame:GetName() == "BagsBar" then
+    for bagFrameName in pairs(bagFrames) do
+      local subframe = _G[bagFrameName]
+      if subframe then
+        subframe:HookScript("OnEnter", actionBar_OnEnter)
+        subframe:HookScript("OnLeave", actionBar_OnEnter)
+      end
     end
   end
 
@@ -472,6 +540,14 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
       onHoverEnabled[currentFrameName] = false
       onHoverSettings_OnUpdate()
       -- currentFrame:SetAlpha(1)
+    end
+  elseif currentFrameName == "BagsBar" then
+    if setting == enum_BagsBarSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
+      onHoverEnabled[currentFrameName] = true
+      onHoverSettings_OnUpdate()
+    elseif setting == enum_BagsBarSetting_BarVisibility then
+      onHoverEnabled[currentFrameName] = false
+      onHoverSettings_OnUpdate()
     end
   end
 
