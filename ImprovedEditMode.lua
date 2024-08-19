@@ -22,6 +22,13 @@ local hideMacroTextEnabled = {
   MultiBarRight = false,
   MultiBarBottonLeft = false,
   MultiBarBottonRight = false,
+
+local abbreviatedKeybindingsEnabled = {
+  MainMenuBar = false,
+  MultiBarLeft = false,
+  MultiBarRight = false,
+  MultiBarBottomLeft = false,
+  MultiBarBottomRight = false,
   MultiBar5 = false,
   MultiBar6 = false,
   MultiBar7 = false,
@@ -65,6 +72,31 @@ local microMenuFrames = {
   MainMenuMicroButton = true,
 }
 
+local keybindMap = {
+  ["Middle Mouse"] = "M3",
+  ["Mouse Wheel Down"] = "MWD",
+  ["Mouse Wheel Up"] = "MWU",
+  ["Home"] = "Hm",
+  ["Insert"] = "Ins",
+  ["Page Down"] = "PD",
+  ["Page Up"] = "PU",
+  ["Spacebar"] = "SpB",
+  ["CTRL-Num Pad 8"] = "G8",
+  ["CTRL-Num Pad 7"] = "G7",
+  ["c-Num Pad 8"] = "G8",
+  ["c-Num Pad 7"] = "G7",
+  ["Mouse Button 5"] = "M5",
+  ["Mouse Button 4"] = "M4",
+}
+
+local keybindPatterns = {
+  ["a%-"] = "A",           -- alt
+  ["c%-"] = "C",           -- ctrl
+  ["s%-"] = "S",           -- shift
+  ["Mouse Button "] = "M", -- M4, M5
+  ["Num Pad "] = "N",
+}
+
 -- Cache frequently used globals
 local editModeSettingsDialog = EditModeSystemSettingsDialog
 local mainMenuBar = MainMenuBar
@@ -73,13 +105,15 @@ local microMenu = MicroMenu
 
 -- extended settings
 local enum_EditModeActionBarSetting_HideMacroText = 10
-local enum_EditModeActionBarSetting_BarVisibility = 11
+local enum_EditModeActionBarSetting_AbbreviateKeybindings = 11
+local enum_EditModeActionBarSetting_BarVisibility = 12
 local enum_ActionBarVisibleSetting_OnHover = 4
 local enum_BagsBarSetting_BarVisibility = 3
 local enum_MicroMenuSetting_BarVisibility = 3
 
 local HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING_ON_HOVER = "On Hover"
 local HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT = "Hide Macro Text"
+local HUD_EDIT_MODE_SETTING_ACTION_BAR_ABBREVIATE_KEYBINDINGS = "Abbreviate Keybindings"
 
 --- Add a setting type to the EditModeSystemSettingsDialog for the given Frame
 ---@param settingIndex number index value of added setting, passed back in editModeSystemSettingsDialog_OnSettingValueChanged
@@ -271,6 +305,22 @@ local function settingsDialogMainMenuBarAddOptions()
     Enum.ChrCustomizationOptionType.Checkbox,
     hideMacroTextData)
 
+  local abbreviateKeybindings = {
+    setting = enum_EditModeActionBarSetting_AbbreviateKeybindings,
+    name = HUD_EDIT_MODE_SETTING_ACTION_BAR_ABBREVIATE_KEYBINDINGS,
+    type = Enum.EditModeSettingDisplayType.Checkbox,
+  }
+
+  local abbreviateKeybindingsData = {
+    displayInfo = abbreviateKeybindings,
+    currentValue = abbreviatedKeybindingsEnabled["MainMenuBar"] == true and 1 or 0,
+    settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_ABBREVIATE_KEYBINDINGS
+  }
+
+  addOptionToSettingsDialog(enum_EditModeActionBarSetting_AbbreviateKeybindings,
+    Enum.ChrCustomizationOptionType.Checkbox,
+    abbreviateKeybindingsData)
+
   local barVisibility = {
     setting = enum_EditModeActionBarSetting_BarVisibility,
     name = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING,
@@ -311,7 +361,8 @@ local function settingsDialogMainMenuBarAddOptions()
 end
 
 --- Add the additional settings to MultiBar e.g any action bar that isn't the main one
-local function settingsDialogMultiBarAddOptions()
+---@param frameName table name of the MultiBar frame being edited
+local function settingsDialogMultiBarAddOptions(frameName)
   local hideMacroText = {
     setting = enum_EditModeActionBarSetting_HideMacroText,
     name = HUD_EDIT_MODE_SETTING_ACTION_BAR_HIDE_MACRO_TEXT,
@@ -324,6 +375,22 @@ local function settingsDialogMultiBarAddOptions()
   }
   addOptionToSettingsDialog(enum_EditModeActionBarSetting_HideMacroText, Enum.ChrCustomizationOptionType.Checkbox,
     hideMacroTextData)
+
+  local abbreviateKeybindings = {
+    setting = enum_EditModeActionBarSetting_AbbreviateKeybindings,
+    name = HUD_EDIT_MODE_SETTING_ACTION_BAR_ABBREVIATE_KEYBINDINGS,
+    type = Enum.EditModeSettingDisplayType.Checkbox,
+  }
+
+  local abbreviateKeybindingsData = {
+    displayInfo = abbreviateKeybindings,
+    currentValue = abbreviatedKeybindingsEnabled[frameName] == true and 1 or 0,
+    settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_ABBREVIATE_KEYBINDINGS
+  }
+
+  addOptionToSettingsDialog(enum_EditModeActionBarSetting_AbbreviateKeybindings,
+    Enum.ChrCustomizationOptionType.Checkbox,
+    abbreviateKeybindingsData)
 end
 
 --- Add the additional settings to BagsBar
@@ -421,7 +488,7 @@ local function editModeSystemSettingsDialog_OnUpdateSettings(self, systemFrame)
     if currentFrameName == "MainMenuBar" then
       settingsDialogMainMenuBarAddOptions()
     elseif strfind(currentFrameName, "MultiBar") then
-      settingsDialogMultiBarAddOptions()
+      settingsDialogMultiBarAddOptions(currentFrameName)
     elseif currentFrameName == "BagsBar" then
       settingsDialogBagBarAddOptions()
     elseif currentFrameName == "MicroMenuContainer" then
@@ -467,6 +534,40 @@ local function actionBar_OnLeave(self)
     for actionBarName, enabled in pairs(onHoverEnabled) do
       if strfind(self:GetName(), actionBarName) and enabled then
         _G[actionBarName]:SetAlpha(0)
+      end
+    end
+  end
+end
+
+--- Enables or disables abbreviated text on an action bar button
+---@param frame table action bar button to set keybind text
+---@param enabled boolean set abbreviated text otherwise set default
+local function frameSetAbbreviatedText(frame, enabled)
+  local hotkey = frame.HotKey
+  local textConstant = hotkey:GetText()
+  local text = hotkey:GetText()
+  if enabled then
+    for k, v in pairs(keybindPatterns) do
+      text = text:gsub(k, v)
+    end
+  else
+    for v, k in pairs(keybindPatterns) do
+      text = text:gsub(k, v)
+    end
+  end
+  hotkey:SetText(keybindMap[textConstant] or text)
+end
+
+--- When keybinds are updated we need to re-set the text if abbreviatedKeybindings are enabled
+---@param self table Frame the action bar button that is updating its text
+local function keybind_OnUpdateHotkey(self)
+  if strfind(self:GetName(), "ActionButton") then
+    if not abbreviatedKeybindingsEnabled["MainMenuBar"] then return end
+    frameSetAbbreviatedText(self, true)
+  else
+    for actionBarName, enabled in pairs(abbreviatedKeybindingsEnabled) do
+      if strfind(self:GetName(), actionBarName) and enabled then
+        frameSetAbbreviatedText(self, true)
       end
     end
   end
@@ -549,6 +650,24 @@ local function hideMacroTextSettings_OnUpdate()
   end
 end
 
+--- When the abbreviatedKeybindingsEnabled table is updated this function should be called
+--- to apply the settings if needed
+local function abbreviatedKeybinginsSettings_OnUpdate()
+  for frameName, enabled in pairs(abbreviatedKeybindingsEnabled) do
+    for i = 12, 1, -1 do
+      if frameName == "MainMenuBar" then frameName = "Action" end
+      local button = _G[frameName .. "Button" .. i]
+      if button then
+        frameSetAbbreviatedText(button, enabled)
+        if not button.BUIIOnUpdateHotkeyHooked then
+          hooksecurefunc(button, "UpdateHotkeys", keybind_OnUpdateHotkey)
+          button.BUIIOnUpdateHotkeyHooked = true
+        end
+      end
+    end
+  end
+end
+
 --- Called when a setting value changes
 ---@param self table EditModeSystemSettingsDialog frame
 ---@param setting number Enum of the setting getting changed
@@ -563,6 +682,9 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
     if setting == enum_EditModeActionBarSetting_HideMacroText then
       hideMacroTextEnabled["MainMenuBar"] = true
       hideMacroTextSettings_OnUpdate()
+    elseif setting == enum_EditModeActionBarSetting_AbbreviateKeybindings then
+      abbreviatedKeybindingsEnabled["MainMenuBar"] = value == 1 and true or false
+      abbreviatedKeybinginsSettings_OnUpdate()
     elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.Always then
       onHoverEnabled["MainMenuBar"] = false
       onHoverSettings_OnUpdate()
@@ -600,6 +722,9 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
     if setting == enum_EditModeActionBarSetting_HideMacroText then
       hideMacroTextEnabled[currentFrameName] = true
       hideMacroTextSettings_OnUpdate()
+    elseif setting == enum_EditModeActionBarSetting_AbbreviateKeybindings then
+      abbreviatedKeybindingsEnabled[currentFrameName] = value == 1 and true or false
+      abbreviatedKeybinginsSettings_OnUpdate()
     elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == enum_ActionBarVisibleSetting_OnHover then
       onHoverEnabled[currentFrameName] = true
       onHoverSettings_OnUpdate()
@@ -627,6 +752,7 @@ local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting,
 
   BUIIDatabase["edit_mode_on_hover_enabled"] = onHoverEnabled
   BUIIDatabase["edit_mode_hide_macro_text_enabled"] = hideMacroTextEnabled
+  BUIIDatabase["edit_mode_abbreviate_keybindings_enabled"] = abbreviatedKeybindingsEnabled
 end
 
 --- Register nessecary hooks for Edit Mode Setttings
@@ -664,6 +790,11 @@ function BUII_ImprovedEditModeEnable()
   if BUIIDatabase["edit_mode_hide_macro_text_enabled"] then
     hideMacroTextEnabled = BUIIDatabase["edit_mode_hide_macro_text_enabled"]
     hideMacroTextSettings_OnUpdate()
+  end
+
+  if BUIIDatabase["edit_mode_abbreviate_keybindings_enabled"] then
+    abbreviatedKeybindingsEnabled = BUIIDatabase["edit_mode_abbreviate_keybindings_enabled"]
+    abbreviatedKeybinginsSettings_OnUpdate()
   end
 
   EventRegistry:RegisterCallback("EditMode.Enter", editMode_OnEnter, "BUII_ImprovedEditMode_OnEnter")
