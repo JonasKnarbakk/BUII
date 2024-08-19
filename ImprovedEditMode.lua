@@ -237,6 +237,7 @@ end
 
 --- Called when EditMode is enabled
 local function editMode_OnEnter()
+  if InCombatLockdown() then return end
   showFrameHighlight(queueStatusButtonOverlayFrame)
 
   -- In edit mode action bars should be shown even if normally hidden
@@ -250,6 +251,7 @@ end
 
 --- Called when EditMode is disabled
 local function editMode_OnExit()
+  if InCombatLockdown() then return end
   hideFrameHighlight(queueStatusButtonOverlayFrame)
 
   -- When exiting edit mode we need to hide aciton bars if they have onHoverEnabled
@@ -486,7 +488,6 @@ end
 local function editModeSystemSettingsDialog_OnUpdateSettings(self, systemFrame)
   if not editModeImprovedEnabled then return end
 
-  -- TODO: Need to fix taint produced when pressing "Action Bar Settings" after a bit
   if systemFrame == self.attachedToSystem then
     local currentFrameName = systemFrame:GetName()
 
