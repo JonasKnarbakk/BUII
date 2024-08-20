@@ -1,0 +1,6 @@
+package-as: BravosUIImprovements
+changelog-title: Bravo's UI Improvements
+
+ignore:
+  - package.sh
+  - Screenshots

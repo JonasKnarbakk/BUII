@@ -4,6 +4,7 @@
 ## SavedVariables: BUIIDatabase
 ## SavedVariablesPerCharacter: BUIICharacterDatabase
 ## IconTexture: Interface\AddOns\BravosUIImprovements\Media\icon
+## X-Curse-Project-ID: 701258
 
 BravosUIImprovements.xml
 ImprovedEditMode.xml
