@@ -20,6 +20,7 @@ All features are optional and if they're not enabled no code related to that fea
     - Added On Hover visibility to action bars, bags and micro menu
     - Hide macro text on action bars
     - Abbreviated keybinding text (like ElvUI)
+    - Move LFG eye independent of micro menu
 
 ## Screenshots
 
