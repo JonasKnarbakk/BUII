@@ -76,29 +76,28 @@ local microMenuFrames = {
   MainMenuMicroButton = true,
 }
 
-local keybindMap = {
-  ["Middle Mouse"] = "M3",
-  ["Mouse Wheel Down"] = "MWD",
-  ["Mouse Wheel Up"] = "MWU",
-  ["Home"] = "Hm",
-  ["Insert"] = "Ins",
-  ["Page Down"] = "PD",
-  ["Page Up"] = "PU",
-  ["Spacebar"] = "SpB",
-  ["CTRL-Num Pad 8"] = "G8",
-  ["CTRL-Num Pad 7"] = "G7",
-  ["c-Num Pad 8"] = "G8",
-  ["c-Num Pad 7"] = "G7",
-  ["Mouse Button 5"] = "M5",
-  ["Mouse Button 4"] = "M4",
-}
-
 local keybindPatterns = {
   ["a%-"] = "A",           -- alt
   ["c%-"] = "C",           -- ctrl
   ["s%-"] = "S",           -- shift
-  ["Mouse Button "] = "M", -- M4, M5
+  ["Middle Mouse"] = "M3",
+  ["Mouse Button "] = "M",
   ["Num Pad "] = "N",
+  ["Mouse Wheel Down"] = "MWD",
+  ["Mouse Wheel Up"] = "MWU",
+  ["Home"] = "HOM",
+  ["End"] = "END",
+  ["Insert"] = "INS",
+  ["Delete"] = "DEL",
+  ["Enter"] = "ENT",
+  ["Backspace"] = "BS",
+  ["Page Down"] = "PD",
+  ["Page Up"] = "PU",
+  ["Spacebar"] = "SPB",
+  ["Left Arrow"] = "LA",
+  ["Up Arrow"] = "UA",
+  ["Down Arrow"] = "DA",
+  ["Right Arrow"] = "RA",
 }
 
 -- Cache frequently used globals
@@ -550,7 +549,6 @@ end
 ---@param enabled boolean set abbreviated text otherwise set default
 local function frameSetAbbreviatedText(frame, enabled)
   local hotkey = frame.HotKey
-  local textConstant = hotkey:GetText()
   local text = hotkey:GetText()
   if enabled then
     for k, v in pairs(keybindPatterns) do
@@ -561,7 +559,7 @@ local function frameSetAbbreviatedText(frame, enabled)
       text = text:gsub(k, v)
     end
   end
-  hotkey:SetText(keybindMap[textConstant] or text)
+  hotkey:SetText(text)
 end
 
 --- When keybinds are updated we need to re-set the text if abbreviatedKeybindings are enabled
