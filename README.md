@@ -1,5 +1,7 @@
 # Bravo's UI Improvements
 
+![release](https://github.com/JonasKnarbakk/BravosUIImprovements/actions/workflows/ci.yml/badge.svg)
+
 User interface improvements to the default UI in World of Warcraft. The goal is not to deviate from the default UI and replace existing frames with something more fancy,
 but rather enhance what's already there with features most users might wish was there by default.
 
