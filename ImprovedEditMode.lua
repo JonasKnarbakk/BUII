@@ -3,17 +3,25 @@ local queueStatusButtonOverlayFrameHook = nil
 local queueStatusButtonOverlayFrameHookEnabled = false
 local editModeImprovedEnabled = false
 
-local onHoverEnabled = {
-  MainMenuBar = false,
-  MultiBarLeft = false,
-  MultiBarRight = false,
-  MultiBarBottomLeft = false,
-  MultiBarBottomRight = false,
-  MultiBar5 = false,
-  MultiBar6 = false,
-  MultiBar7 = false,
-  BagsBar = false,
-  MicroMenu = false,
+local VisibilityMode = {
+  ALWAYS_VISIBLE = 0,
+  IN_COMBAT = 1,
+  OUT_OF_COMBAT = 2,
+  HIDDEN = 3,
+  ON_HOVER = 4,
+}
+
+local FrameVisibility = {
+  MainMenuBar = VisibilityMode.ALWAYS_VISIBLE,
+  MultiBarLeft = VisibilityMode.ALWAYS_VISIBLE,
+  MultiBarRight = VisibilityMode.ALWAYS_VISIBLE,
+  MultiBarBottomLeft = VisibilityMode.ALWAYS_VISIBLE,
+  MultiBarBottomRight = VisibilityMode.ALWAYS_VISIBLE,
+  MultiBar5 = VisibilityMode.ALWAYS_VISIBLE,
+  MultiBar6 = VisibilityMode.ALWAYS_VISIBLE,
+  MultiBar7 = VisibilityMode.ALWAYS_VISIBLE,
+  BagsBar = VisibilityMode.ALWAYS_VISIBLE,
+  MicroMenu = VisibilityMode.ALWAYS_VISIBLE,
 }
 
 local hideMacroTextEnabled = {
@@ -77,9 +85,9 @@ local microMenuFrames = {
 }
 
 local keybindPatterns = {
-  ["a%-"] = "A",           -- alt
-  ["c%-"] = "C",           -- ctrl
-  ["s%-"] = "S",           -- shift
+  ["a%-"] = "A", -- alt
+  ["c%-"] = "C", -- ctrl
+  ["s%-"] = "S", -- shift
   ["Middle Mouse"] = "M3",
   ["Mouse Button "] = "M",
   ["Num Pad "] = "N",
@@ -237,10 +245,11 @@ end
 --- Called when EditMode is enabled
 local function editMode_OnEnter()
   if InCombatLockdown() then return end
+
   showFrameHighlight(queueStatusButtonOverlayFrame)
 
   -- In edit mode action bars should be shown even if normally hidden
-  for frameName in pairs(onHoverEnabled) do
+  for frameName in pairs(FrameVisibility) do
     local frame = _G[frameName]
     if frame then
       frame:SetAlpha(1)
@@ -253,11 +262,38 @@ local function editMode_OnExit()
   if InCombatLockdown() then return end
   hideFrameHighlight(queueStatusButtonOverlayFrame)
 
-  -- When exiting edit mode we need to hide aciton bars if they have onHoverEnabled
-  for frameName, enabled in pairs(onHoverEnabled) do
+  -- When exiting edit mode we need to hide aciton bars if they have VisibilityMode.ON_HOVER,
+  -- VisibilityMode.IN_COMBAT or VisibilityMode.HIDDEN
+  for frameName, mode in pairs(FrameVisibility) do
     local frame = _G[frameName]
-    if frame and enabled then
+    if frame and (mode ~= VisibilityMode.ALWAYS_VISIBLE and mode ~= VisibilityMode.OUT_OF_COMBAT) then
       frame:SetAlpha(0)
+    end
+  end
+end
+
+-- Called when the player enters combat
+local function combat_OnEnter()
+  for frameName, mode in pairs(FrameVisibility) do
+    local frame = _G[frameName]
+    if mode == VisibilityMode.IN_COMBAT then
+      frame:Show()
+    elseif mode == VisibilityMode.OUT_OF_COMBAT then
+      frame:Hide()
+    end
+  end
+end
+
+-- Called when the player leaves combat
+local function combat_OnExit()
+  if InCombatLockdown() then return end
+
+  for frameName, mode in pairs(FrameVisibility) do
+    local frame = _G[frameName]
+    if mode == VisibilityMode.IN_COMBAT then
+      frame:Hide()
+    elseif mode == VisibilityMode.OUT_OF_COMBAT then
+      frame:Show()
     end
   end
 end
@@ -357,7 +393,7 @@ local function settingsDialogMainMenuBarAddOptions()
 
   local barVisibilityData = {
     displayInfo = barVisibility,
-    currentValue = onHoverEnabled["MainMenuBar"] == true and enum_ActionBarVisibleSetting_OnHover or Enum.ActionBarVisibleSetting.Always,
+    currentValue = FrameVisibility["MainMenuBar"],
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
   }
 
@@ -431,7 +467,7 @@ local function settingsDialogBagBarAddOptions()
 
   local barVisibilityData = {
     displayInfo = barVisibility,
-    currentValue = onHoverEnabled["BagsBar"] == true and enum_ActionBarVisibleSetting_OnHover or Enum.ActionBarVisibleSetting.Always,
+    currentValue = FrameVisibility["BagsBar"],
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
   }
 
@@ -472,7 +508,7 @@ local function settingsDialogMicroMenuAddOptions()
 
   local barVisibilityData = {
     displayInfo = barVisibility,
-    currentValue = onHoverEnabled["MicroMenu"] == true and enum_ActionBarVisibleSetting_OnHover or Enum.ActionBarVisibleSetting.Always,
+    currentValue = FrameVisibility["MicroMenu"],
     settingName = HUD_EDIT_MODE_SETTING_ACTION_BAR_VISIBLE_SETTING
   }
 
@@ -506,17 +542,17 @@ end
 ---@param self table Frame that triggered the OnEnter event
 local function actionBar_OnEnter(self)
   if strfind(self:GetName(), "ActionButton") then
-    if not onHoverEnabled["MainMenuBar"] then return end
+    if FrameVisibility["MainMenuBar"] ~= VisibilityMode.ON_HOVER then return end
     mainMenuBar:SetAlpha(1)
   elseif bagFrames[self:GetName()] then
-    if not onHoverEnabled["BagsBar"] then return end
+    if FrameVisibility["BagsBar"] ~= VisibilityMode.ON_HOVER then return end
     bagsBar:SetAlpha(1)
   elseif microMenuFrames[self:GetName()] then
-    if not onHoverEnabled["MicroMenu"] then return end
+    if FrameVisibility["MicroMenu"] ~= VisibilityMode.ON_HOVER then return end
     microMenu:SetAlpha(1)
   else
-    for actionBarName, enabled in pairs(onHoverEnabled) do
-      if strfind(self:GetName(), actionBarName) and enabled then
+    for actionBarName, mode in pairs(FrameVisibility) do
+      if strfind(self:GetName(), actionBarName) and mode == VisibilityMode.ON_HOVER then
         _G[actionBarName]:SetAlpha(1)
       end
     end
@@ -527,17 +563,17 @@ end
 ---@param self table Frame that triggered the OnLeave event
 local function actionBar_OnLeave(self)
   if strfind(self:GetName(), "ActionButton") then
-    if not onHoverEnabled["MainMenuBar"] then return end
+    if FrameVisibility["MainMenuBar"] ~= VisibilityMode.ON_HOVER then return end
     mainMenuBar:SetAlpha(0)
   elseif bagFrames[self:GetName()] then
-    if not onHoverEnabled["BagsBar"] then return end
+    if FrameVisibility["BagsBar"] ~= VisibilityMode.ON_HOVER then return end
     bagsBar:SetAlpha(0)
   elseif microMenuFrames[self:GetName()] then
-    if not onHoverEnabled["MicroMenu"] then return end
+    if FrameVisibility["MicroMenu"] ~= VisibilityMode.ON_HOVER then return end
     microMenu:SetAlpha(0)
   else
-    for actionBarName, enabled in pairs(onHoverEnabled) do
-      if strfind(self:GetName(), actionBarName) and enabled then
+    for actionBarName, mode in pairs(FrameVisibility) do
+      if strfind(self:GetName(), actionBarName) and mode == VisibilityMode.ON_HOVER then
         _G[actionBarName]:SetAlpha(0)
       end
     end
@@ -620,13 +656,13 @@ local function hookActionBarOnHoverEvent(frame)
   frameHookSet[frame:GetName()] = true
 end
 
---- When the onHoverEnabled table is updated this function should be called
+--- When the FrameVisibility table is updated this function should be called
 --- to apply the settings if needed
-local function onHoverSettings_OnUpdate()
-  for frameName, enabled in pairs(onHoverEnabled) do
+local function frameVisibilitySettings_OnUpdate()
+  for frameName, mode in pairs(FrameVisibility) do
     local frame = _G[frameName]
     if frame then
-      if enabled then
+      if mode == VisibilityMode.ON_HOVER then
         if not editModeManagerFrame.editModeActive then
           frame:SetAlpha(0)
         end
@@ -679,70 +715,52 @@ end
 ---@param setting number Enum of the setting getting changed
 ---@param value number New value for the setting that is changing
 local function editModeSystemSettingsDialog_OnSettingValueChanged(self, setting, value)
-  -- print("editModeSystemSettingsDialog_OnSettingValueChanged: setting ", setting, " value ", value)
+  -- print("editModeSystemSettingsDialog_OnSettingValueChanged frame: ", self.attachedToSystem:GetName(), " setting: ",
+  --   setting, " value: ", value)
   local currentFrame = self.attachedToSystem
   local currentFrameName = currentFrame:GetName()
 
-  -- TODO: refactor this crap
-  if currentFrameName == "MainMenuBar" then
+  if currentFrameName == "MicroMenuContainer" then
+    currentFrameName = "MicroMenu"
+  end
+
+  -- small hack to align setting value with action bars enum
+  if ((currentFrameName == "BagsBar" or currentFrameName == "MicroMenu") and setting == 3) or
+      (currentFrameName == "MainMenuBar" and setting == enum_EditModeActionBarSetting_BarVisibility) then
+    setting = Enum.EditModeActionBarSetting.VisibleSetting
+  end
+
+  if FrameVisibility[currentFrameName] ~= nil then
     if setting == enum_EditModeActionBarSetting_HideMacroText then
-      hideMacroTextEnabled["MainMenuBar"] = value == 1 and true or false
-      hideMacroTextSettings_OnUpdate()
-    elseif setting == enum_EditModeActionBarSetting_AbbreviateKeybindings then
-      abbreviatedKeybindingsEnabled["MainMenuBar"] = value == 1 and true or false
-      abbreviatedKeybinginsSettings_OnUpdate()
-    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.Always then
-      onHoverEnabled["MainMenuBar"] = false
-      onHoverSettings_OnUpdate()
-    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.InCombat then
-      onHoverEnabled["MainMenuBar"] = false
-      onHoverSettings_OnUpdate()
-      print("In Combat MainMenuBar Not supported yet")
-    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.OutOfCombat then
-      onHoverEnabled["MainMenuBar"] = false
-      onHoverSettings_OnUpdate()
-      print("Out of Combat MainMenuBar Not supported yet")
-    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == Enum.ActionBarVisibleSetting.Hidden then
-      onHoverEnabled["MainMenuBar"] = false
-      onHoverSettings_OnUpdate()
-      print("Hidden MainMenuBar Not supported yet")
-    elseif setting == enum_EditModeActionBarSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
-      onHoverEnabled["MainMenuBar"] = true
-      onHoverSettings_OnUpdate()
-    end
-  elseif strfind(currentFrameName, "MultiBar") then
-    if setting == enum_EditModeActionBarSetting_HideMacroText then
-      hideMacroTextEnabled[currentFrameName] = true
+      hideMacroTextEnabled[currentFrameName] = value == 1 and true or false
       hideMacroTextSettings_OnUpdate()
     elseif setting == enum_EditModeActionBarSetting_AbbreviateKeybindings then
       abbreviatedKeybindingsEnabled[currentFrameName] = value == 1 and true or false
       abbreviatedKeybinginsSettings_OnUpdate()
+    elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == Enum.ActionBarVisibleSetting.Always then
+      FrameVisibility[currentFrameName] = VisibilityMode.ALWAYS_VISIBLE
+      frameVisibilitySettings_OnUpdate()
+      editModeSettingsDialog:UpdateSettings(currentFrame)
+    elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == Enum.ActionBarVisibleSetting.InCombat then
+      FrameVisibility[currentFrameName] = VisibilityMode.IN_COMBAT
+      frameVisibilitySettings_OnUpdate()
+      editModeSettingsDialog:UpdateSettings(currentFrame)
+    elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == Enum.ActionBarVisibleSetting.OutOfCombat then
+      FrameVisibility[currentFrameName] = VisibilityMode.OUT_OF_COMBAT
+      frameVisibilitySettings_OnUpdate()
+      editModeSettingsDialog:UpdateSettings(currentFrame)
+    elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == Enum.ActionBarVisibleSetting.Hidden then
+      FrameVisibility[currentFrameName] = VisibilityMode.HIDDEN
+      frameVisibilitySettings_OnUpdate()
+      editModeSettingsDialog:UpdateSettings(currentFrame)
     elseif setting == Enum.EditModeActionBarSetting.VisibleSetting and value == enum_ActionBarVisibleSetting_OnHover then
-      onHoverEnabled[currentFrameName] = true
-      onHoverSettings_OnUpdate()
-    elseif setting == Enum.EditModeActionBarSetting.VisibleSetting then
-      onHoverEnabled[currentFrameName] = false
-      onHoverSettings_OnUpdate()
-    end
-  elseif currentFrameName == "BagsBar" then
-    if setting == enum_BagsBarSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
-      onHoverEnabled[currentFrameName] = true
-      onHoverSettings_OnUpdate()
-    elseif setting == enum_BagsBarSetting_BarVisibility then
-      onHoverEnabled[currentFrameName] = false
-      onHoverSettings_OnUpdate()
-    end
-  elseif currentFrameName == "MicroMenuContainer" then
-    if setting == enum_MicroMenuSetting_BarVisibility and value == enum_ActionBarVisibleSetting_OnHover then
-      onHoverEnabled["MicroMenu"] = true
-      onHoverSettings_OnUpdate()
-    elseif setting == enum_BagsBarSetting_BarVisibility then
-      onHoverEnabled["MicroMenu"] = false
-      onHoverSettings_OnUpdate()
+      FrameVisibility[currentFrameName] = VisibilityMode.ON_HOVER
+      frameVisibilitySettings_OnUpdate()
+      editModeSettingsDialog:UpdateSettings(currentFrame)
     end
   end
 
-  BUIIDatabase["edit_mode_on_hover_enabled"] = onHoverEnabled
+  BUIIDatabase["frame_visibility_mode"] = FrameVisibility
   BUIIDatabase["edit_mode_hide_macro_text_enabled"] = hideMacroTextEnabled
   BUIIDatabase["edit_mode_abbreviate_keybindings_enabled"] = abbreviatedKeybindingsEnabled
 end
@@ -770,9 +788,21 @@ function BUII_ImprovedEditModeEnable()
   setupQueueStatusButton()
   setupEditModeSystemSettingsDialog()
 
+  -- compatability with old database that only stored booleans for onHover setting
   if BUIIDatabase["edit_mode_on_hover_enabled"] then
-    onHoverEnabled = BUIIDatabase["edit_mode_on_hover_enabled"]
-    onHoverSettings_OnUpdate()
+    local onHoverEnabled = BUIIDatabase["edit_mode_on_hover_enabled"]
+    for frameName, enabled in pairs(onHoverEnabled) do
+      if enabled then
+        VisibilityMode[frameName] = VisibilityMode.ON_HOVER
+      end
+    end
+    frameVisibilitySettings_OnUpdate()
+    BUIIDatabase["edit_mode_on_hover_enabled"] = nil
+  end
+
+  if BUIIDatabase["frame_visibility_mode"] then
+    FrameVisibility = BUIIDatabase["frame_visibility_mode"]
+    frameVisibilitySettings_OnUpdate()
   end
 
   if BUIIDatabase["edit_mode_hide_macro_text_enabled"] then
@@ -786,7 +816,12 @@ function BUII_ImprovedEditModeEnable()
   end
 
   EventRegistry:RegisterCallback("EditMode.Enter", editMode_OnEnter, "BUII_ImprovedEditMode_OnEnter")
-  EventRegistry:RegisterCallback("EditMode.Exit", editMode_OnExit, "BUI_ImprovedEditMode_OnExit")
+  EventRegistry:RegisterCallback("EditMode.Exit", editMode_OnExit, "BUII_ImprovedEditMode_OnExit")
+
+  EventRegistry:RegisterFrameEventAndCallback("PLAYER_REGEN_DISABLED", combat_OnEnter,
+    "BUII_ImprovedEditMode_OnCombatEnter")
+  EventRegistry:RegisterFrameEventAndCallback("PLAYER_REGEN_ENABLED", combat_OnExit,
+    "BUII_ImprovedEditMode_OnCombatLeave")
 
   editModeImprovedEnabled = true
 end
@@ -796,7 +831,10 @@ function BUII_ImprovedEditModeDisable()
   resetQueueStatusButton()
 
   EventRegistry:UnregisterCallback("EditMode.Enter", "BUII_ImprovedEditMode_OnEnter")
-  EventRegistry:UnregisterCallback("EditMode.Exit", "BUI_ImprovedEditMode_OnExit")
+  EventRegistry:UnregisterCallback("EditMode.Exit", "BUII_ImprovedEditMode_OnExit")
+
+  EventRegistry:UnregisterCallback("PLAYER_REGEN_DISABLED", "BUII_ImprovedEditMode_OnCombatEnter")
+  EventRegistry:UnregisterCallback("PLAYER_REGEN_ENABLED", "BUII_ImprovedEditMode_OnCombatLeave")
 
   editModeImprovedEnabled = false
 end
